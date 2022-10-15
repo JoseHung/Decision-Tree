@@ -1,5 +1,3 @@
-
-
 """
     input:
         S: the training set
@@ -24,11 +22,27 @@
 """
 
 """
-input: the path of the data file
+data structure of the node
+"""
+
+
+class node:
+    def __init__(self, left_node=None, right_node=None, attribute=None, label=None, condition=None):
+        self.left_node = left_node  # left node
+        self.right_node = right_node  # right node
+        self.attribute = attribute  # the split attribute
+        self.label = label  # the predicate label
+        self.condition = condition  # the split condition
+
+
+"""
+    input: the path of the data file
 function: To read the original data and preprocess the data with removing all the records containing '?' and
             the attribute "native-country". Then save the data to the dataset
 output: dataset
 """
+
+
 def load_dataset(filename):
     fr = open(filename)
     dataset = []
@@ -47,6 +61,8 @@ input: dataset
 function: calculate the gini value of the dataset
 output: the gini value 
 """
+
+
 def calc_gini(dataset):
     # the total number of the data
     num_of_data = len(dataset)
@@ -68,49 +84,122 @@ input: dataset, index, value
 function: split the dataset into two subsets based on whether the index attribute is value
 output: sub_dataset
 """
-def split_dataset(dataset, index, value):
+
+
+def split_dataset(dataset, index):
+    value = []
+    best_gini = 1
+    best_condition = None
     sub_dataset1 = []
     sub_dataset2 = []
-    for example in dataset:
-        current_list = []
-        if example[index] == value:
-            current_list = example[:index]
-            current_list.extend(example[index + 1:])
-            sub_dataset1.append(current_list)
-        else:
-            current_list = example[:index]
-            current_list.extend(example[index + 1:])
-            sub_dataset2.append(current_list)
-    print(sub_dataset1)
-    return sub_dataset1, sub_dataset2
+    if not isinstance(dataset[0][index], int):
+        for element in dataset:
+            if element[index] not in value:
+                value.append(element[index])
+        num_attributes = len(value)
+        for i in range(num_attributes):
+            left = []
+            right = []
+            condition = value[i]
+            for data in dataset:
+                if data[index] == condition:
+                    left.append(data)
+                else:
+                    right.append(data)
+            left_gini = calc_gini(left)
+            right_gini = calc_gini(right)
+            temp_gini = left_gini * (len(left) / len(dataset)) + right_gini * (len(right) / len(dataset))
+            if temp_gini < best_gini:
+                best_gini = temp_gini
+                sub_dataset1 = left
+                sub_dataset2 = right
+                best_condition = condition
+    else:
+        dataset = sorted(dataset, key=lambda x: x[index])
+        for i in range(1, len(dataset)):
+            if dataset[i][index] == dataset[i - 1][index]:
+                continue
+            else:
+                left_gini = calc_gini(dataset[:i])
+                right_gini = calc_gini(dataset[i:])
+                temp_gini = left_gini * (i + 1) / len(dataset) + right_gini * (len(dataset) - i - 1) / len(dataset)
+                if temp_gini < best_gini:
+                    best_gini = temp_gini
+                    sub_dataset1 = dataset[:i]
+                    sub_dataset2 = dataset[i:]
+                    best_condition = dataset[i][index]
+    return [sub_dataset1, sub_dataset2], best_condition, best_gini
 
 
 """
 input: dataset
-function: find the best split
-output: index_of_best_feature, best_split_point
+function: according to hunt algorithm to recursively process the data to generate a decision tree
+output: a decision tree
 """
-def find_best_split(dataset):
-    # the number of attributes
-    num_attributes = len(dataset[0]) - 1
-    if num_attributes == 1:
-        return 0
-    best_gini = 1
-    index_of_best_split = -1
-    for i in range(num_attributes):
-        # duplicate removal
-        unique_vals = set(example[i] for example in dataset)
-        gini = {}
-        for value in unique_vals:
-            sub_dataset1, sub_dataset2 = split_dataset(dataset, i, value)
-            # 建一个二叉树类，在递归处理数据时，实时构建出二叉树；
-            # 根据离散和连续的两类数值写出对应分割点的函数
-            # 递归函数注意终止条件
 
+
+def hunt(dataset):
+    # if all the objects in S belong to the same class
+    # return a leaf node with the value of this class
+    current_label = dataset[0][-1]
+    flag = 0
+    for data in dataset:
+        if data[-1] != current_label:
+            flag = 1
+            break
+        else:
+            continue
+    if flag == 0:
+        return node(label=current_label)
+
+    # if (all the objects in S have the same attribute values)
+    # return a leaf node whose class value is the majority one in S
+    flag_1 = 0
+    for i in range(1, len(dataset)):
+        for j in range(len(dataset[0]) - 1):
+            if dataset[i][j] != dataset[i - 1][j]:
+                flag_1 = 1
+                break
+            else:
+                continue
+    if len(dataset) <= 500:
+        flag_1 = 0
+    if flag_1 == 0:
+        dict = {}
+        for data in dataset:
+            if data[-1] not in dict.keys():
+                dict[data[-1]] = 1
+            else:
+                dict[data[-1]] += 1
+        value_list = list(dict.values())
+        key = list(dict.keys())[value_list.index(max(value_list))]
+        return node(label=key)
+    # find the 'best' split attribute A* and predicate P*
+    best_gini = 0.5
+    best_split = None
+    best_attribute = None
+    best_condition = None
+    for i in range(len(dataset[0]) - 1):
+        current_split, current_condition, current_gini = split_dataset(dataset, i)
+        if current_gini < best_gini:
+            best_gini = current_gini
+            best_split = current_split
+            best_condition = current_condition
+            best_attribute = i
+    sub_left = hunt(best_split[0])
+    sub_right = hunt(best_split[1])
+    return node(left_node=sub_left, right_node=sub_right, attribute=best_attribute, condition=best_condition)
+
+
+def print_tree(node):
+    print("label:", node.label, "attribute:", node.attribute, "condition:", node.condition)
+    if node.label == None:
+        print_tree(node.left_node)
+        print_tree(node.right_node)
 
 
 if __name__ == '__main__':
     training_data_path = "./training_set/adult.data"
     dataset = load_dataset(training_data_path)
-    calc_gini(dataset)
-
+    root = hunt(dataset)
+    print_tree(root)
