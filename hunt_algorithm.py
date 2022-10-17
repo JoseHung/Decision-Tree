@@ -1,4 +1,4 @@
-# data structure of the node
+# data structure of the decision tree node
 class node:
     def __init__(self, left_node=None, right_node=None, attribute=None, label=None, condition=None):
         self.left_node = left_node  # left node
@@ -10,7 +10,7 @@ class node:
 
 """
 function: To read the original data and preprocess the data with removing all the records containing '?' and
-          the attribute "native-country". Then save the data to the dataset
+          the attribute "native-country". Then save the data to the dataset.
 input: the path of the data file
 output: dataset
 """
